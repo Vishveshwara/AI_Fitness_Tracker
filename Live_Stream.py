@@ -4,6 +4,8 @@ import streamlit as st
 from streamlit_webrtc import VideoHTMLAttributes, webrtc_streamer
 from aiortc.contrib.media import MediaRecorder
 import av
+import cv2
+from utils import get_mediapipe_pose
 
 # Set base directory and append to system path for conditional imports later
 #BASE_DIR = os.path.abspath(os.path.join(__file__, '../../'))
@@ -23,7 +25,7 @@ pose = None
 # Only import and set up modules after user selects an exercise
 if exercise_choice == "Bicep Curls":
     # Import necessary functions and classes for Bicep Curls
-    from utils import get_mediapipe_pose
+    
     from process_frame import ProcessFrame
     from thresholds import get_bicep_curl_thresholds
     
@@ -36,7 +38,6 @@ if exercise_choice == "Bicep Curls":
 
 elif exercise_choice == "Squats":
     # Import necessary functions and classes for Squats
-    from utils import get_mediapipe_pose
     from process_frame2 import ProcessFrame2
     from thresholds import get_thresholds
     
