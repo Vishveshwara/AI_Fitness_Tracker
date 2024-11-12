@@ -6,8 +6,8 @@ from aiortc.contrib.media import MediaRecorder
 import av
 
 # Set base directory and append to system path for conditional imports later
-BASE_DIR = os.path.abspath(os.path.join(__file__, '../../'))
-sys.path.append(BASE_DIR)
+#BASE_DIR = os.path.abspath(os.path.join(__file__, '../../'))
+#sys.path.append(BASE_DIR)
 
 # Main title of the application
 st.title('FITVOYAGE AI FITNESS TRAINER')
