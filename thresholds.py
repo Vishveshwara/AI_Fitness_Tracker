@@ -23,3 +23,26 @@ def get_thresholds():
                 }
 
     return thresholds
+
+def get_bicep_curl_thresholds():
+    # Elbow curl angle: Decreases from 90 (fully extended) towards 0 (fully curled)
+    _ANGLE_ELBOW_CURL = {
+                          'NORMAL': (15, 30),  # Initial extended position
+                          'TRANS': (70, 90),  # Arm halfway bent
+                          'PASS': (130, 145)     # Arm fully curled
+                        }
+
+    # Shoulder angle thresholds to prevent overextension and maintain alignment
+    thresholds = {
+                    'ELBOW_CURL': _ANGLE_ELBOW_CURL,
+                    
+                    'SHOULDER_THRESH': [160],    # Shoulder angle to detect shoulder alignment <70
+                    'WRIST_THRESH': [15, 30, 70],    # Elbow angle for different stages of curl
+                    
+                    'OFFSET_THRESH': 35.0,
+                    'INACTIVE_THRESH': 15.0,
+                    
+                    'CNT_FRAME_THRESH': 50          # Frames to consider for one complete curl
+                }
+
+    return thresholds

@@ -73,44 +73,43 @@ class ProcessFrame:
             'INACTIVE_TIME': 0.0,
             'INACTIVE_TIME_FRONT': 0.0,
 
-            # 0 --> Bend Backwards, 1 --> Bend Forward, 2 --> Keep shin straight, 3 --> Deep squat
-            'DISPLAY_TEXT' : np.full((4,), False),
-            'COUNT_FRAMES' : np.zeros((4,), dtype=np.int64),
+            # Feedback indicators: 0 --> Elbow too far back, 1 --> Not fully extending arm, 2 --> Keep elbow steady, 3 --> Wrist bending
+            'DISPLAY_TEXT': np.full((4,), False),      # Tracking if each feedback type is currently displayed
+            'COUNT_FRAMES': np.zeros((4,), dtype=np.int64),  # Frame counters for each feedback type
 
-            'LOWER_HIPS': False,
+            'CURL_ARMS': False,        # Indicates if arms are lowering to complete the curl rep
 
-            'INCORRECT_POSTURE': False,
+            'INCORRECT_POSTURE': False,  # Flags when posture does not meet requirements for a proper bicep curl
 
-            'prev_state': None,
-            'curr_state':None,
+            'prev_state': None,          # Tracks previous state to detect transitions
+            'curr_state': None,          # Tracks current state for comparison
 
-            'SQUAT_COUNT': 0,
-            'IMPROPER_SQUAT':0
-            
+            'CURL_COUNT': 0,             # Total count of completed curls
+            'IMPROPER_CURL': 0           # Count of curls with improper form
         }
-        
+
         self.FEEDBACK_ID_MAP = {
-                                0: ('BEND BACKWARDS', 215, (0, 153, 255)),
-                                1: ('BEND FORWARD', 215, (0, 153, 255)),
-                                2: ('KNEE FALLING OVER TOE', 170, (255, 80, 80)),
-                                3: ('SQUAT TOO DEEP', 125, (255, 80, 80))
-                               }
-
-        
+        0: ('ELBOW TOO FAR BACK', 215, (255, 80, 80)),           # Elbow is moving too far back
+        1: ('FULLY EXTENDING ARM!!', 215, (255, 153, 51)),     # Arm not fully extended at bottom
+        2: ('KEEP ELBOW STEADY', 170, (0, 153, 255)),            # Elbow moving during curl
+        3: ('CURL YOUR ARMS COMPLETELY', 125, (255, 80, 80))                 # Wrist bending causing improper form
+        }
 
 
-    def _get_state(self, knee_angle):
-        
-        knee = None        
 
-        if self.thresholds['HIP_KNEE_VERT']['NORMAL'][0] <= knee_angle <= self.thresholds['HIP_KNEE_VERT']['NORMAL'][1]:
-            knee = 1
-        elif self.thresholds['HIP_KNEE_VERT']['TRANS'][0] <= knee_angle <= self.thresholds['HIP_KNEE_VERT']['TRANS'][1]:
-            knee = 2
-        elif self.thresholds['HIP_KNEE_VERT']['PASS'][0] <= knee_angle <= self.thresholds['HIP_KNEE_VERT']['PASS'][1]:
-            knee = 3
+    def _get_state(self, elbow_angle):
+        state = None        
 
-        return f's{knee}' if knee else None
+        # Checking if the elbow angle falls within the defined thresholds for each state
+        if self.thresholds['ELBOW_CURL']['NORMAL'][0] <= elbow_angle <= self.thresholds['ELBOW_CURL']['NORMAL'][1]:
+            state = 1  # Arm fully extended
+        elif self.thresholds['ELBOW_CURL']['TRANS'][0] <= elbow_angle <= self.thresholds['ELBOW_CURL']['TRANS'][1]:
+            state = 2  # Arm halfway bent
+        elif self.thresholds['ELBOW_CURL']['PASS'][0] <= elbow_angle <= self.thresholds['ELBOW_CURL']['PASS'][1]:
+            state = 3  # Arm fully curled
+
+        # Return the state as a string prefixed with 's' for state, or None if no condition is met
+        return f's{state}' if state else None
 
 
 
@@ -130,13 +129,13 @@ class ProcessFrame:
             
 
 
-    def _show_feedback(self, frame, c_frame, dict_maps, lower_hips_disp):
+    def _show_feedback(self, frame, c_frame, dict_maps, curl_arms_disp):
 
 
-        if lower_hips_disp:
+        if curl_arms_disp:
             draw_text(
                     frame, 
-                    'LOWER YOUR HIPS', 
+                    'CURL YOUR ARMS', 
                     pos=(30, 80),
                     text_color=(0, 0, 0),
                     font_scale=0.6,
@@ -186,8 +185,8 @@ class ProcessFrame:
                 self.state_tracker['start_inactive_time_front'] = end_time
 
                 if self.state_tracker['INACTIVE_TIME_FRONT'] >= self.thresholds['INACTIVE_THRESH']:
-                    self.state_tracker['SQUAT_COUNT'] = 0
-                    self.state_tracker['IMPROPER_SQUAT'] = 0
+                    self.state_tracker['CURL_COUNT'] = 0
+                    self.state_tracker['IMPROPER_CURL'] = 0
                     display_inactivity = True
 
                 cv2.circle(frame, nose_coord, 7, self.COLORS['white'], -1)
@@ -198,7 +197,7 @@ class ProcessFrame:
                     frame = cv2.flip(frame, 1)
 
                 if display_inactivity:
-                    # cv2.putText(frame, 'Resetting SQUAT_COUNT due to inactivity!!!', (10, frame_height - 90), 
+                    # cv2.putText(frame, 'Resetting CURL_COUNT due to inactivity!!!', (10, frame_height - 90), 
                     #             self.font, 0.5, self.COLORS['blue'], 2, lineType=self.linetype)
                     play_sound = 'reset_counters'
                     self.state_tracker['INACTIVE_TIME_FRONT'] = 0.0
@@ -206,7 +205,7 @@ class ProcessFrame:
 
                 draw_text(
                     frame, 
-                    "CORRECT: " + str(self.state_tracker['SQUAT_COUNT']), 
+                    "CORRECT: " + str(self.state_tracker['CURL_COUNT']), 
                     pos=(int(frame_width*0.68), 30),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
@@ -216,7 +215,7 @@ class ProcessFrame:
 
                 draw_text(
                     frame, 
-                    "INCORRECT: " + str(self.state_tracker['IMPROPER_SQUAT']), 
+                    "INCORRECT: " + str(self.state_tracker['IMPROPER_CURL']), 
                     pos=(int(frame_width*0.68), 80),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
@@ -292,33 +291,36 @@ class ProcessFrame:
                     multiplier = 1
                     
 
-                # ------------------- Verical Angle calculation --------------
-                
-                hip_vertical_angle = find_angle(shldr_coord, np.array([hip_coord[0], 0]), hip_coord)
-                cv2.ellipse(frame, hip_coord, (30, 30), 
-                            angle = 0, startAngle = -90, endAngle = -90+multiplier*hip_vertical_angle, 
-                            color = self.COLORS['white'], thickness = 3, lineType = self.linetype)
+               # ------------------- Vertical Angle Calculation for Bicep Curl --------------
 
-                draw_dotted_line(frame, hip_coord, start=hip_coord[1]-80, end=hip_coord[1]+20, line_color=self.COLORS['blue'])
+                # Calculate elbow vertical angle (elbow relative to shoulder)
+                elbow_vertical_angle = find_angle(shldr_coord, np.array([elbow_coord[0], 0]), elbow_coord)
+                cv2.ellipse(frame, elbow_coord, (30, 30), 
+                            angle=0, startAngle=-90, endAngle=-90 + multiplier * elbow_vertical_angle, 
+                            color=self.COLORS['white'], thickness=3, lineType=self.linetype)
 
-
-
-
-                knee_vertical_angle = find_angle(hip_coord, np.array([knee_coord[0], 0]), knee_coord)
-                cv2.ellipse(frame, knee_coord, (20, 20), 
-                            angle = 0, startAngle = -90, endAngle = -90-multiplier*knee_vertical_angle, 
-                            color = self.COLORS['white'], thickness = 3,  lineType = self.linetype)
-
-                draw_dotted_line(frame, knee_coord, start=knee_coord[1]-50, end=knee_coord[1]+20, line_color=self.COLORS['blue'])
+                # Draw dotted line at elbow
+                draw_dotted_line(frame, elbow_coord, start=elbow_coord[1] - 50, end=elbow_coord[1] + 20, line_color=self.COLORS['blue'])
 
 
+                # Calculate shoulder alignment angle (back alignment for stability)
+                shoulder_alignment_angle = find_angle(elbow_coord, np.array([shldr_coord[0], 0]), shldr_coord)
+                cv2.ellipse(frame, shldr_coord, (20, 20), 
+                            angle=0, startAngle=-90, endAngle=-90 - multiplier * shoulder_alignment_angle, 
+                            color=self.COLORS['white'], thickness=3, lineType=self.linetype)
 
-                ankle_vertical_angle = find_angle(knee_coord, np.array([ankle_coord[0], 0]), ankle_coord)
-                cv2.ellipse(frame, ankle_coord, (30, 30),
-                            angle = 0, startAngle = -90, endAngle = -90 + multiplier*ankle_vertical_angle,
-                            color = self.COLORS['white'], thickness = 3,  lineType=self.linetype)
+                # Draw dotted line at shoulder
+                draw_dotted_line(frame, shldr_coord, start=shldr_coord[1] - 50, end=shldr_coord[1] + 20, line_color=self.COLORS['blue'])
 
-                draw_dotted_line(frame, ankle_coord, start=ankle_coord[1]-50, end=ankle_coord[1]+20, line_color=self.COLORS['blue'])
+
+                # Calculate wrist angle for finer control over arm positioning
+                wrist_angle = find_angle(elbow_coord, np.array([wrist_coord[0], 0]), wrist_coord)
+                cv2.ellipse(frame, wrist_coord, (30, 30),
+                            angle=0, startAngle=-90, endAngle=-90 + multiplier * wrist_angle,
+                            color=self.COLORS['white'], thickness=3, lineType=self.linetype)
+
+                # Draw dotted line at wrist
+                draw_dotted_line(frame, wrist_coord, start=wrist_coord[1] - 50, end=wrist_coord[1] + 20, line_color=self.COLORS['blue'])
 
                 # ------------------------------------------------------------
         
@@ -342,7 +344,7 @@ class ProcessFrame:
 
                 
 
-                current_state = self._get_state(int(knee_vertical_angle))
+                current_state = self._get_state(int(wrist_angle)) 
                 self.state_tracker['curr_state'] = current_state
                 self._update_state_sequence(current_state)
 
@@ -353,15 +355,15 @@ class ProcessFrame:
                 if current_state == 's1':
 
                     if len(self.state_tracker['state_seq']) == 3 and not self.state_tracker['INCORRECT_POSTURE']:
-                        self.state_tracker['SQUAT_COUNT']+=1
-                        play_sound = str(self.state_tracker['SQUAT_COUNT'])
+                        self.state_tracker['CURL_COUNT']+=1
+                        play_sound = str(self.state_tracker['CURL_COUNT'])
                         
                     elif 's2' in self.state_tracker['state_seq'] and len(self.state_tracker['state_seq'])==1:
-                        self.state_tracker['IMPROPER_SQUAT']+=1
+                        self.state_tracker['IMPROPER_CURL']+=1
                         play_sound = 'incorrect'
 
                     elif self.state_tracker['INCORRECT_POSTURE']:
-                        self.state_tracker['IMPROPER_SQUAT']+=1
+                        self.state_tracker['IMPROPER_CURL']+=1
                         play_sound = 'incorrect'
                         
                     
@@ -377,29 +379,41 @@ class ProcessFrame:
                 # -------------------------------------- PERFORM FEEDBACK ACTIONS --------------------------------------
 
                 else:
-                    if hip_vertical_angle > self.thresholds['HIP_THRESH'][1]:
+                    '''if shoulder_alignment_angle < self.thresholds['SHOULDER_THRESH'][0] and \
+                         self.state_tracker['state_seq'].count('s1')==1:
                         self.state_tracker['DISPLAY_TEXT'][0] = True
                         
 
-                    elif hip_vertical_angle < self.thresholds['HIP_THRESH'][0] and \
+                    elif shoulder_alignment_angle < self.thresholds['SHOULDER_THRESH'][0] and \
                          self.state_tracker['state_seq'].count('s2')==1:
-                            self.state_tracker['DISPLAY_TEXT'][1] = True
+                            self.state_tracker['DISPLAY_TEXT'][1] = True'''
                         
                                         
                     
-                    if self.thresholds['KNEE_THRESH'][0] < knee_vertical_angle < self.thresholds['KNEE_THRESH'][1] and \
+                    '''if self.thresholds['ELBOW_THRESH'][0] < shoulder_alignment_angle < self.thresholds['ELBOW_THRESH'][1] and \
                        self.state_tracker['state_seq'].count('s2')==1:
-                        self.state_tracker['LOWER_HIPS'] = True
+                        self.state_tracker['CURL_ARMS'] = True'''
 
+                    if shoulder_alignment_angle < self.thresholds['SHOULDER_THRESH'][0]:
+                        self.state_tracker['DISPLAY_TEXT'][0] = True  # Feedback: Elbow too far back
 
-                    elif knee_vertical_angle > self.thresholds['KNEE_THRESH'][2]:
-                        self.state_tracker['DISPLAY_TEXT'][3] = True
-                        self.state_tracker['INCORRECT_POSTURE'] = True
+                    # Check if arm is not fully extended
+                    '''if wrist_angle > self.thresholds['ELBOW_CURL']['NORMAL'][1] and \
+                    self.state_tracker['state_seq'].count('s2') != 1:
+                        self.state_tracker['DISPLAY_TEXT'][1] = True ''' # Feedback: Not fully extending arm
 
+                    if wrist_angle > self.thresholds['ELBOW_CURL']['NORMAL'][1]:
+                        if self.state_tracker['state_seq'].count('s2') != 1:
+                            self.state_tracker['DISPLAY_TEXT'][1] = True
+                        else:
+                            self.state_tracker['DISPLAY_TEXT'][3] = True
                     
-                    if (ankle_vertical_angle > self.thresholds['ANKLE_THRESH']):
-                        self.state_tracker['DISPLAY_TEXT'][2] = True
-                        self.state_tracker['INCORRECT_POSTURE'] = True
+                    # Check for elbow stability during curl
+                    if self.thresholds['ELBOW_CURL']['TRANS'][0] < wrist_angle < self.thresholds['ELBOW_CURL']['TRANS'][1] and \
+                    self.state_tracker['state_seq'].count('s2') == 1:
+                        self.state_tracker['DISPLAY_TEXT'][2] = True  # Feedback: Keep elbow steady
+
+
 
 
                 # ----------------------------------------------------------------------------------------------------
@@ -418,8 +432,8 @@ class ProcessFrame:
                     self.state_tracker['start_inactive_time'] = end_time
 
                     if self.state_tracker['INACTIVE_TIME'] >= self.thresholds['INACTIVE_THRESH']:
-                        self.state_tracker['SQUAT_COUNT'] = 0
-                        self.state_tracker['IMPROPER_SQUAT'] = 0
+                        self.state_tracker['CURL_COUNT'] = 0
+                        self.state_tracker['IMPROPER_CURL'] = 0
                         display_inactivity = True
 
                 
@@ -432,24 +446,22 @@ class ProcessFrame:
               
 
 
-                hip_text_coord_x = hip_coord[0] + 10
-                knee_text_coord_x = knee_coord[0] + 15
-                ankle_text_coord_x = ankle_coord[0] + 10
+                shldr_text_coord_x = shldr_coord[0]+10
+                wrist_text_coord_x = wrist_coord[0]+10
 
                 if self.flip_frame:
                     frame = cv2.flip(frame, 1)
-                    hip_text_coord_x = frame_width - hip_coord[0] + 10
-                    knee_text_coord_x = frame_width - knee_coord[0] + 15
-                    ankle_text_coord_x = frame_width - ankle_coord[0] + 10
+                    shldr_text_coord_x = frame_width - shldr_coord[0]+10
+                    wrist_text_coord_x = frame_width - wrist_coord[0]+10
 
                 
                 
                 if 's3' in self.state_tracker['state_seq'] or current_state == 's1':
-                    self.state_tracker['LOWER_HIPS'] = False
+                    self.state_tracker['CURL_ARMS'] = False
 
                 self.state_tracker['COUNT_FRAMES'][self.state_tracker['DISPLAY_TEXT']]+=1
 
-                frame = self._show_feedback(frame, self.state_tracker['COUNT_FRAMES'], self.FEEDBACK_ID_MAP, self.state_tracker['LOWER_HIPS'])
+                frame = self._show_feedback(frame, self.state_tracker['COUNT_FRAMES'], self.FEEDBACK_ID_MAP, self.state_tracker['CURL_ARMS'])
 
 
 
@@ -460,14 +472,12 @@ class ProcessFrame:
                     self.state_tracker['INACTIVE_TIME'] = 0.0
 
                 
-                cv2.putText(frame, str(int(hip_vertical_angle)), (hip_text_coord_x, hip_coord[1]), self.font, 0.6, self.COLORS['light_green'], 2, lineType=self.linetype)
-                cv2.putText(frame, str(int(knee_vertical_angle)), (knee_text_coord_x, knee_coord[1]+10), self.font, 0.6, self.COLORS['light_green'], 2, lineType=self.linetype)
-                cv2.putText(frame, str(int(ankle_vertical_angle)), (ankle_text_coord_x, ankle_coord[1]), self.font, 0.6, self.COLORS['light_green'], 2, lineType=self.linetype)
-
+                cv2.putText(frame, str(int(shoulder_alignment_angle)), (shldr_text_coord_x, shldr_coord[1]), self.font, 0.6, self.COLORS['light_green'], 2, lineType=self.linetype)
+                cv2.putText(frame, str(int(wrist_angle)), (wrist_text_coord_x, wrist_coord[1]), self.font, 0.6, self.COLORS['light_green'], 2, lineType=self.linetype) 
                  
                 draw_text(
                     frame, 
-                    "CORRECT: " + str(self.state_tracker['SQUAT_COUNT']), 
+                    "CORRECT: " + str(self.state_tracker['CURL_COUNT']), 
                     pos=(int(frame_width*0.68), 30),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
@@ -477,7 +487,7 @@ class ProcessFrame:
 
                 draw_text(
                     frame, 
-                    "INCORRECT: " + str(self.state_tracker['IMPROPER_SQUAT']), 
+                    "INCORRECT: " + str(self.state_tracker['IMPROPER_CURL']), 
                     pos=(int(frame_width*0.68), 80),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
@@ -504,8 +514,8 @@ class ProcessFrame:
             display_inactivity = False
 
             if self.state_tracker['INACTIVE_TIME'] >= self.thresholds['INACTIVE_THRESH']:
-                self.state_tracker['SQUAT_COUNT'] = 0
-                self.state_tracker['IMPROPER_SQUAT'] = 0
+                self.state_tracker['CURL_COUNT'] = 0
+                self.state_tracker['IMPROPER_CURL'] = 0
                 # cv2.putText(frame, 'Resetting SQUAT_COUNT due to inactivity!!!', (10, frame_height - 25), self.font, 0.7, self.COLORS['blue'], 2)
                 display_inactivity = True
 
@@ -513,7 +523,7 @@ class ProcessFrame:
 
             draw_text(
                     frame, 
-                    "CORRECT: " + str(self.state_tracker['SQUAT_COUNT']), 
+                    "CORRECT: " + str(self.state_tracker['CURL_COUNT']), 
                     pos=(int(frame_width*0.68), 30),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
@@ -523,7 +533,7 @@ class ProcessFrame:
 
             draw_text(
                     frame, 
-                    "INCORRECT: " + str(self.state_tracker['IMPROPER_SQUAT']), 
+                    "INCORRECT: " + str(self.state_tracker['IMPROPER_CURL']), 
                     pos=(int(frame_width*0.68), 80),
                     text_color=(255, 255, 230),
                     font_scale=0.7,
